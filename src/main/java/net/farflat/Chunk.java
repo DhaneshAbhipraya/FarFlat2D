@@ -1,9 +1,9 @@
 package net.farflat;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import java.util.function.Function;
-
-import static net.farflat.Mathematical.lerp;
 
 public class Chunk {
     private final int chunkWidth;
@@ -27,34 +27,12 @@ public class Chunk {
         return (int) (x + y * chunkWidth);
     }
 
-    @Deprecated
-    public void generate(int firstBlockPos, PerlinNoise noise) {
-        for (int x = firstBlockPos; x < firstBlockPos + chunkWidth; x++) {
-            Function<Integer, Integer> noiseSupplier = p->Math.max(0, (int) getBiomeHeight(p, getBiomeId(p, noise, biomeSeed), noise));
-            int height = noiseSupplier.apply(x);
-            for (int i = 0; i < height; i++) {
-                setBlock(x, i, 1);
-            }
-
-            int dirtHeight = 4;
-            for (int i = height; i < height + dirtHeight; i++) {
-                setBlock(x, i, 2);
-            }
-            setBlock(x, height + dirtHeight, 3);
-            int bottomBorderHeight = 7;
-            for (int i = 1; i < bottomBorderHeight; i ++) {
-                setBlock(x, i, Math.random() < Math.pow(((float)i)/bottomBorderHeight, 0.5) ? -1 : 4);
-            }
-            setBlock(x, 0, 4);
-        }
-    }
-
     public static class TerrainGenerator extends Thread {
         private Chunk target;
-        private int firstBlockPos;
+        private long firstBlockPos;
         private long noiseSeed;
 
-        public TerrainGenerator(Chunk target, int firstBlockPos, long noiseSeed) {
+        public TerrainGenerator(Chunk target, long firstBlockPos, long noiseSeed) {
             this.target = target;
             this.firstBlockPos = firstBlockPos;
             this.noiseSeed = noiseSeed;
@@ -64,7 +42,7 @@ public class Chunk {
             this.target = target;
         }
 
-        public void setFirstBlockPos(int firstBlockPos) {
+        public void setFirstBlockPos(long firstBlockPos) {
             this.firstBlockPos = firstBlockPos;
         }
 
@@ -73,17 +51,17 @@ public class Chunk {
         }
 
         public void run() {
-            for (int x = firstBlockPos; x < firstBlockPos + target.chunkWidth; x++) {
+            for (long x = firstBlockPos; x < firstBlockPos + target.chunkWidth; x++) {
                 new TerrainSliceGenerator(target, x, noiseSeed).run();
             }
         }
 
         class TerrainSliceGenerator extends Thread {
             private Chunk target;
-            private final int x;
+            private final long x;
             private long noiseSeed;
 
-            public TerrainSliceGenerator(Chunk target, int firstBlockPos, long noiseSeed) {
+            public TerrainSliceGenerator(Chunk target, long firstBlockPos, long noiseSeed) {
                 this.target = target;
                 this.x = firstBlockPos;
                 this.noiseSeed = noiseSeed;
@@ -98,30 +76,34 @@ public class Chunk {
             }
 
             public void run() {
-                for (int i = 0; i < 63; i++) {
-                    target.setBlock(x, i, 5);
+                for (int i = 0; i < target.chunkHeight / 2 - 1; i++) {
+                    target.setBlock((int) (x % target.chunkWidth), i, 5);
                 }
-                Function<Integer, Integer> biomeIdSupplier = p->target.getBiomeId(p, new PerlinNoise(new Random(noiseSeed+1)), target.biomeSeed);
-                Function<Integer, Integer> noiseSupplier = p->Math.max(0, (int) target.getBiomeHeight(p, biomeIdSupplier.apply(p), new PerlinNoise(new Random(noiseSeed))));
-                Function<Integer, Double> continentalnessNoiseSupplier = p->Math.max(0, Math.min(1, new PerlinNoise(new Random(noiseSeed+31311)).perlin(p/(Math.PI*50), 0.5, 2, 2)/2.+1));
-                Function<Integer, Integer> heightOffsetDueToContinentalnessSupplier = p-> (int) (Math.pow(1.2*continentalnessNoiseSupplier.apply(p),0.5)*10-0.5);
-//                Function<Point2, Integer> twoDimensionalCaveNoiseSupplier =
-                int height = noiseSupplier.apply(x)+heightOffsetDueToContinentalnessSupplier.apply(x);
+                Function<Long, Integer> biomeIdSupplier = p -> target.getBiomeId(p, new PerlinNoise(new Random(noiseSeed + 1)), target.biomeSeed);
+                Function<Long, Integer> noiseSupplier = p -> Math.max(0, (int) target.getBiomeHeight(p, biomeIdSupplier.apply(p), new PerlinNoise(new Random(noiseSeed))));
+                Function<Long, Double> continentalnessNoiseSupplier = p -> Math.max(0, Math.min(1, new PerlinNoise(new Random(noiseSeed + 31311)).perlin(p / (Math.PI * 50), 0.5, 2, 2) / 2. + 1));
+                Function<Long, Integer> heightOffsetDueToContinentalnessSupplier = p -> (int) (Math.pow(1.2 * continentalnessNoiseSupplier.apply(p), 0.5) * 10 - 0.5);
+                Function<Point2, Double> twoDimensionalCaveNoiseSupplier = p -> SimplexNoise.noise(p.x / 53.101 + 0x3f951e * noiseSeed, p.y / 52.982 + noiseSeed + 0xfe9f1e * noiseSeed) + p.y / ((double) target.chunkHeight);
+                Function<Point2, Double> twoDimensionalTravelCaveNoiseSupplier = p -> SimplexNoise.noise(p.x / 53.101 + .12 + 0x6f951e * noiseSeed, p.y / 52.982 + .12 + 0x9e121e * noiseSeed) + p.y / ((double) target.chunkHeight) + .2 + Math.random()/100;
+                int height = noiseSupplier.apply(x) + heightOffsetDueToContinentalnessSupplier.apply(x);
 //                int height = (int) (heightOffsetDueToContinentalnessSupplier.apply(x)*30+100);
                 for (int i = 0; i < height; i++) {
-//                    if (twoDimensionalCaveNoiseSupplier)
-                        target.setBlock(x, i, biomeBlocks.getOrDefault(biomeIdSupplier.apply(x), List.of(1,2,3)).get(0));
+                    target.setBlock((int) (x % target.chunkWidth), i, biomeBlocks.getOrDefault(biomeIdSupplier.apply(x), List.of(1, 2, 3)).get(0));
                 }
                 int dirtHeight = 4;
                 for (int i = height; i < height + dirtHeight; i++) {
-                    target.setBlock(x, i, biomeBlocks.getOrDefault(biomeIdSupplier.apply(x), List.of(1,2,3)).get(1));
+                    target.setBlock((int) (x % target.chunkWidth), i, biomeBlocks.getOrDefault(biomeIdSupplier.apply(x), List.of(1, 2, 3)).get(1));
                 }
-                target.setBlock(x, height + dirtHeight, biomeBlocks.getOrDefault(biomeIdSupplier.apply(x), List.of(1,2,3)).get(2));
+                target.setBlock((int) (x % target.chunkWidth), height + dirtHeight, biomeBlocks.getOrDefault(biomeIdSupplier.apply(x), List.of(1, 2, 3)).get(2));
+                for (int y = 0; y < target.chunkHeight; y++) {
+                    if (BlockInfo.getBlockInfo(target.getBlock((int) (x % target.chunkWidth), y)).solid() && twoDimensionalCaveNoiseSupplier.apply(new Point2(x, y)) < 0 || Math.abs(twoDimensionalTravelCaveNoiseSupplier.apply(new Point2(x, y))) < .1)
+                        target.setBlock((int) (x % target.chunkWidth), y, 0);
+                }
                 int bottomBorderHeight = 7;
-                for (int i = 1; i < bottomBorderHeight; i ++) {
-                    target.setBlock(x, i, Math.random() < Math.pow(((float)i)/bottomBorderHeight, 0.5) ? -1 : 4);
+                for (int i = 1; i < bottomBorderHeight; i++) {
+                    target.setBlock((int) (x % target.chunkWidth), i, Math.random() < Math.pow(((float) i) / bottomBorderHeight, 0.5) ? 1 : 4);
                 }
-                target.setBlock(x, 0, 4);
+                target.setBlock((int) (x % target.chunkWidth), 0, 4);
             }
         }
     }
@@ -133,18 +115,18 @@ public class Chunk {
 
     private static final int biomes = 3;
 
-    int getBiomeId(int x, PerlinNoise noise, long biomeSeed) {
+    int getBiomeId(Long x, PerlinNoise noise, long biomeSeed) {
 //        Random rand = new Random(biomeSeed + (x / 8));
 //        return lerp(rand.nextDouble() * biomes, );
-        return noise.noise((float) (x/(Math.PI*50))) < 0 ? 0 : 1;
+        return noise.noise((float) (x / (Math.PI * 50))) < 0 ? 0 : 1;
     }
 
-    double getBiomeHeight(int x, int biomeId, PerlinNoise noise) {
+    double getBiomeHeight(Long x, int biomeId, PerlinNoise noise) {
         return switch (biomeId) {
 //            case 0 -> noise.perlin(x / (Math.PI * 10), 0.5, 8, 2) * 2. + 64.;
-            case 0 -> SimplexNoise.noise(x/171.103, 0) * 2. + 64.;
-            case 1 -> noise.perlin(x / (Math.PI * 10), 0.5, 8, 2) * 10. + 64.;
-            default -> Math.random()*this.chunkHeight;
+            case 0 -> SimplexNoise.noise(x / 171.103, 0) * 2. + chunkHeight / 2.;
+            case 1 -> noise.perlin(x / (Math.PI * 10), 0.5, 8, 2) * 10. + chunkHeight / 2.;
+            default -> Math.random() * this.chunkHeight;
         };
     }
 
@@ -162,7 +144,7 @@ public class Chunk {
 
     public void setBlock(int x, int y, int blockType) {
         if (blockType < 0) return;
-        if (isInChunkBounds(x, y-(x/chunkWidth))) {
+        if (isInChunkBounds(x, y - (x / chunkWidth))) {
             hasBeenAccessed = true;
             blocks[posToIndex(x, y - (x / chunkWidth))] = blockType;
         }

@@ -27,7 +27,7 @@ public class FarFlat extends JPanel {
     public FarFlat() {
         instance = this;
         world = new World(1);
-        player = new Player(world, 0, world.getHeight() - 100);
+        player = new Player(world, 0, 0);
         screenWidth = 800;
         screenHeight = 600;
 

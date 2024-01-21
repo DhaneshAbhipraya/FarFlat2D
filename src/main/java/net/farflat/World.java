@@ -35,7 +35,7 @@ public class World {
         if (!loadedChunks.containsKey(chunkPos)) {
             Chunk newChunk = new Chunk(chunkWidth, chunkHeight, biomeSeed);
 //            newChunk.generate(chunkPos * chunkWidth, noise);
-            new Chunk.TerrainGenerator(newChunk, chunkPos.multiply(BigInteger.valueOf(chunkWidth)).intValue(), noiseSeed).start();
+            new Chunk.TerrainGenerator(newChunk, chunkPos.multiply(BigInteger.valueOf(chunkWidth)).longValue(), noiseSeed).start();
             loadedChunks.put(chunkPos, newChunk);
             return newChunk;
         }
