@@ -11,9 +11,7 @@ import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
-import static net.farflat.Constants.MAX_SAFE_DOUBLE;
 import static net.farflat.Mathematical.squishOutsideZC;
 
 public class FarFlat extends JPanel {
