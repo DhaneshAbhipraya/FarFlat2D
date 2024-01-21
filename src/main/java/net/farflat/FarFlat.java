@@ -27,7 +27,7 @@ public class FarFlat extends JPanel {
     public FarFlat() {
         instance = this;
         world = new World(1);
-        player = new Player(world, 0, 0);
+        player = new Player(world, BigDecimal.valueOf(Long.MAX_VALUE).multiply(BigDecimal.valueOf(2.)).add(BigDecimal.valueOf(Math.random()*2-1).multiply(BigDecimal.valueOf(Constants.MAX_SAFE_FLOAT))), 0);
         screenWidth = 800;
         screenHeight = 600;
 
@@ -145,6 +145,11 @@ class Player {
         this.x = BigDecimal.valueOf(x);
         this.y = y;
         this.world = world;
+    }
+
+    public Player(World world, BigDecimal x, double y) {
+        this(world, 0, y);
+        this.x = x;
     }
 
     public BigDecimal getX() {
