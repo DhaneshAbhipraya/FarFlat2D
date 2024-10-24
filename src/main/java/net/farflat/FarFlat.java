@@ -11,23 +11,25 @@ import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
+import static net.farflat.Mathematical.MAX_NORMAL_WORLD_POS;
 import static net.farflat.Mathematical.squishOutsideZC;
 
 public class FarFlat extends JPanel {
+    private static final float divisor = 1.1f;
+    public static FarFlat instance;
     private int scale = 5;
-    private World world;
-    private Player player;
+    private final World world;
+    private final Player player;
     private int screenWidth;
     private int screenHeight;
     private double screenSize;
-    private static final float divisor = 1.1f;
-    public static FarFlat instance;
 
     public FarFlat() {
         instance = this;
         world = new World(1);
-        player = new Player(world, BigDecimal.valueOf(Long.MAX_VALUE).multiply(BigDecimal.valueOf(2.)).add(BigDecimal.valueOf(Math.random()*2-1).multiply(BigDecimal.valueOf(Constants.MAX_SAFE_FLOAT))), 0);
+        player = new Player(world, new Random().nextLong(0L, Mathematical.MAX_SAFE_WORLD_POS), world.getHeight() / 2);
         screenWidth = 800;
         screenHeight = 600;
 
@@ -56,6 +58,7 @@ public class FarFlat extends JPanel {
 
     public void run(double delta) {
         player.update(delta);
+        if (player.x.compareTo(new BigDecimal(MAX_NORMAL_WORLD_POS)) > 0 && player.x.compareTo(new BigDecimal("1000000000000")) < 0 && StoryEffects.enable_out_of_world_warning) world.loadedChunks.clear();
     }
 
     @Override
@@ -68,16 +71,18 @@ public class FarFlat extends JPanel {
         g.fillRect((int) ((screenWidth * divisor - screenWidth) / 2), (int) ((screenHeight * divisor - screenHeight) / 2), screenWidth, screenHeight);
 
         // Draw the visible portion of the world around the player
-        AABB aabb = new AABB((playerX.subtract(BigDecimal.valueOf(screenWidth / 2.))), (((double) playerY) - screenHeight / 2.), (playerX.add(BigDecimal.valueOf(screenWidth / 2.))), (((double) playerY) + screenHeight / 2.)).factor(1. / scale).inflate(world.getChunkWidth(), 10).add(Math.min(0, player.velocityX / world.getChunkWidth()), 0, Math.max(0, player.velocityX / world.getChunkWidth()), 0);
+        AABB aabb = new AABB((playerX.subtract(BigDecimal.valueOf(screenWidth / 2.))), (playerY - screenHeight / 2.), (playerX.add(BigDecimal.valueOf(screenWidth / 2.))), (playerY + screenHeight / 2.)).factor(1. / scale).inflate(world.getChunkWidth(), 10).add(Math.min(0, player.velocityX / world.getChunkWidth()), 0, Math.max(0, player.velocityX / world.getChunkWidth()), 0);
         BlockPos[] positions = world.getAllPositionsInAABB(aabb);
+        final BigDecimal trillion = new BigDecimal("1000000000000");
+        final BigDecimal quadrillion = new BigDecimal("1000000000000000");
         for (BlockPos position : positions) {
-            g.setColor(determineColor(world.getBlock(position.x(), position.y())));
-            if (player.getSolidTouchingBlocks().stream().anyMatch(p -> p == position)) {
-                g.setColor(Color.PINK);
-            }
+            g.setColor(determineColor(world.getBlock(position.x(), position.y()), position.x(), (int) position.y()));
             double x = (new BigDecimal(position.x().multiply(BigInteger.valueOf(scale))).subtract(playerX.multiply(BigDecimal.valueOf(scale))).add(BigDecimal.valueOf(screenWidth / 2.)).subtract(BigDecimal.valueOf(scale / 2.))).doubleValue();
+            if (StoryEffects.enable_trillion_glitch && position.x().compareTo(trillion.toBigInteger()) >= 0 && (position.x().compareTo(quadrillion.toBigInteger()) < 0 || !StoryEffects.enable_infinite_quadrillion_paradise)) {
+                x += new Random().nextDouble(playerX.divide(trillion, RoundingMode.FLOOR).subtract(BigDecimal.ONE).divide(new BigDecimal("1000"), RoundingMode.HALF_UP).doubleValue())*2-1;
+            }
             double y = (((float) position.y()) * scale - ((float) playerY) * scale + screenHeight / 2. - scale / 2.);
-            g.fillRect((int) ((squishOutsideZC(x, screenWidth)) + (screenWidth * divisor - screenWidth) / 2), (int) ((squishOutsideZC(y, screenHeight)) + (screenHeight * divisor - screenHeight) / 2), scale, scale);
+            g.fillRect((int) ((squishOutsideZC(x, screenWidth)) + (screenWidth * divisor - screenWidth) / 2), (int) ((squishOutsideZC(y, screenHeight)) + (screenHeight * divisor - screenHeight) / 2), scale*2, scale);
         }
         int maxChunks = (int) (100 + (aabb.x2().divide(BigDecimal.valueOf(world.getChunkWidth()), new MathContext(34, RoundingMode.CEILING)).subtract(aabb.x1().divide(BigDecimal.valueOf(world.getChunkWidth()), new MathContext(34, RoundingMode.FLOOR)))).doubleValue());
         int lim = 10;
@@ -98,11 +103,14 @@ public class FarFlat extends JPanel {
         // Draw the player at the center of the screen
         int playerScreenX = (int) (screenWidth / 2 - scale / 2 + (screenWidth * divisor - screenWidth) / 2);
         int playerScreenY = (int) (screenHeight / 2 - scale / 2 + (screenHeight * divisor - screenHeight) / 2);
-        g.setColor(Color.BLUE);
+        g.setColor(Color.GREEN);
+        if (StoryEffects.enable_infinite_quadrillion_paradise && playerX.compareTo(quadrillion) >= 0) {
+            g.setColor(Color.PINK);
+        }
         g.fillRect(playerScreenX, playerScreenY, scale, scale);
 
         g.setFont(new Font("Arial", Font.BOLD, 20));
-        g.setColor(Color.BLACK);
+        g.setColor(Color.WHITE);
         g.drawString("X: %s".formatted(new DecimalFormat("#.###################").format(playerX)), 0, 20);
         g.drawString("Y: %s".formatted(world.getHeight() - playerY), 0, 40);
         g.drawString("C: %s/%s".formatted(world.loadedChunks.size(), maxChunks), 0, 60);
@@ -113,9 +121,12 @@ public class FarFlat extends JPanel {
         world.resetAccessedCheck();
     }
 
-    private Color determineColor(int blockType) {
+    private Color determineColor(int blockType, BigInteger x, int y) {
+        float sky = Math.max(0, Math.min(1, (float) y / world.getHeight()));
+        float spaceFalloff = (float) Math.pow(sky, 3);
         return switch (blockType) {
-            case 0 -> new Color(0xFFFFFF);
+            case 0 ->
+                    new Color((int) (((1.1f - sky) * spaceFalloff) * 255), (int) (((1.1f - sky) * spaceFalloff) * 255), (int) ((sky + (1 - sky) * spaceFalloff) * 255));
             case 1 -> new Color(0x7E7E7E);
             case 2 -> new Color(0x8D4A11);
             case 3 -> new Color(0x149B10);
@@ -127,6 +138,8 @@ public class FarFlat extends JPanel {
 }
 
 class Player {
+    private final World world;
+    public boolean hasCollision = true;
     BigDecimal x;
     double y;
     double velocityX;
@@ -137,19 +150,12 @@ class Player {
     private boolean rightPressed;
     private boolean upPressed;
     private boolean downPressed;
-    private final World world;
-    public boolean hasCollision = true;
     private double speed = 10;
 
     public Player(World world, double x, double y) {
         this.x = BigDecimal.valueOf(x);
         this.y = y;
         this.world = world;
-    }
-
-    public Player(World world, BigDecimal x, double y) {
-        this(world, 0, y);
-        this.x = x;
     }
 
     public BigDecimal getX() {
@@ -192,34 +198,22 @@ class Player {
                 if (s == null) break;
                 speed = Double.parseDouble(s);
             }
-            case KeyEvent.VK_R -> {
-                world.loadedChunks.clear();
-            }
+            case KeyEvent.VK_R -> world.loadedChunks.clear();
             case KeyEvent.VK_SPACE -> {
                 velocityX = 0;
                 velocityY = 0;
             }
-            case KeyEvent.VK_C -> {
-                hasCollision ^= true;
-            }
+            case KeyEvent.VK_C -> hasCollision ^= true;
         }
     }
 
     public void keyReleased(KeyEvent e) {
         int keyCode = e.getKeyCode();
         switch (keyCode) {
-            case KeyEvent.VK_LEFT:
-                leftPressed = false;
-                break;
-            case KeyEvent.VK_RIGHT:
-                rightPressed = false;
-                break;
-            case KeyEvent.VK_UP:
-                upPressed = false;
-                break;
-            case KeyEvent.VK_DOWN:
-                downPressed = false;
-                break;
+            case KeyEvent.VK_LEFT -> leftPressed = false;
+            case KeyEvent.VK_RIGHT -> rightPressed = false;
+            case KeyEvent.VK_UP -> upPressed = false;
+            case KeyEvent.VK_DOWN -> downPressed = false;
         }
     }
 
@@ -248,6 +242,10 @@ class Player {
         return getTouchingBlocks().stream().filter(x -> BlockInfo.getBlockInfo(world.getBlock(x.x(), x.y())).solid()).toList();
     }
 
+    public List<BlockPos> getLiquidTouchingBlocks() {
+        return getTouchingBlocks().stream().filter(x -> BlockInfo.getBlockInfo(world.getBlock(x.x(), x.y())).liquid()).toList();
+    }
+
     public void update(double delta) {
         // Update acceleration based on key presses
         accelerationX = ((rightPressed ? speed * 500 : 0) + (leftPressed ? -speed * 500 : 0)) * delta;
@@ -271,7 +269,7 @@ class Player {
 
         if (y > world.getHeight() + 10) {
             velocityY *= -0.7;
-            velocityX += Math.signum(velocityX) * velocityY * 0.3;
+            velocityX += -Math.signum(velocityX) * velocityY * 0.3;
             y = world.getHeight() + 10;
         }
         if (y < -10) {
@@ -281,9 +279,13 @@ class Player {
         }
 
         if (hasCollision) {
+            if (getLiquidTouchingBlocks().size() > 0) {
+                this.velocityY -= 3;
+            }
+
             List<BlockPos> pos = getCollidingBlocks();
             final double radiusStep = 0.1;
-            final double maxRadius = 10;
+            final double maxRadius = 100;
             double radius = radiusStep;
             BigDecimal ox = x;
             double oy = y;
@@ -304,10 +306,15 @@ class Player {
                 y = oy;
                 pos = getCollidingBlocks();
                 if (pos.size() == 0) break;
+                x = ox;
+                y = oy;
                 radius += radiusStep;
             }
             if (radius != maxRadius) {
-                if (x.compareTo(ox) != 0) velocityX = 0;
+                if (x.compareTo(ox) != 0) {
+                    velocityX = 0;
+                    x = x.round(new MathContext(34, RoundingMode.HALF_UP));
+                }
                 if (y != oy) velocityY = 0;
             }
         }

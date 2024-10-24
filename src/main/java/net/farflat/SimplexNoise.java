@@ -1,12 +1,12 @@
 package net.farflat;
 
-public class SimplexNoise {
+public final class SimplexNoise {
 
-    private static final int[][] grad3 = {
-            {1, 1, 0}, {-1, 1, 0}, {1, -1, 0},
-            {-1, -1, 0}, {1, 0, 1}, {-1, 0, 1},
-            {1, 0, -1}, {-1, 0, -1}, {0, 1, 1},
-            {0, -1, 1}, {0, 1, -1}, {0, -1, -1}
+    static final int[][] grad3 = {
+            {1, 1, 0}, {-1, 1, 0}, {1, -1, 0}, {-1, -1, 0},
+            {1, 0, 1}, {-1, 0, 1}, {1, 0, -1}, {-1, 0, -1},
+            {0, 1, 1}, {0, -1, 1}, {0, 1, -1}, {0, -1, -1},
+            {1, 1, 0}, {0, -1, 1}, {-1, 1, 0}, {0, -1, -1}
     };
 
     private static final int[] p = {
@@ -44,33 +44,10 @@ public class SimplexNoise {
         return x > 0 ? (int) x : (int) x - 1;
     }
 
-    private static double dot(int[] g, double x, double y) {
-        return g[0] * x + g[1] * y;
-    }
-
-    private static double dot(int[] g, double x, double y, double z) {
-        return g[0] * x + g[1] * y + g[2] * z;
-    }
-
-    private static double grad(int hash, double x) {
-        int h = hash & 15;
-        double grad = 1 + (h & 7); // Gradient value 1-8
-        if ((h & 8) != 0) grad = -grad; // Randomly invert half of them
-        return (grad * x); // Multiply the gradient with the distance
-    }
-
-    private static double grad(int hash, double x, double y) {
+    public static double grad(int hash, double x, double y) {
         int h = hash & 15;
         double u = h < 8 ? x : y; // Choose between x and y for the gradient
         double v = h < 4 ? y : h == 12 || h == 14 ? x : 0; // Choose either 0 or x/y based on hash value
-
-        return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v); // Combine the results
-    }
-
-    private static double grad(int hash, double x, double y, double z) {
-        int h = hash & 15;
-        double u = h < 8 ? x : y; // Choose between x and y for the gradient
-        double v = h < 4 ? y : h == 12 || h == 14 ? x : z; // Choose between y and z for the gradient
 
         return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v); // Combine the results
     }
@@ -154,5 +131,9 @@ public class SimplexNoise {
                 System.out.println(value);
             }
         }
+    }
+
+    public static double processGrad(int[] ints, double xFactor, double yFactor, double zFactor) {
+        return (double) ints[0] * xFactor + (double) ints[1] * yFactor + (double) ints[2] * zFactor;
     }
 }

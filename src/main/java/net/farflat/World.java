@@ -1,16 +1,16 @@
 package net.farflat;
 
 import java.math.BigInteger;
-import java.util.*;
-
-import static java.lang.Math.max;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 public class World {
-    private final int chunkWidth = 32;
-    private final int chunkHeight = 512;
-    private long noiseSeed;
+    private final int chunkWidth = 16;
+    private final int chunkHeight = 1024;
+    private final long noiseSeed;
     Map<BigInteger, Chunk> loadedChunks;
-    private long biomeSeed;
 
     public World(long noiseSeed) {
         this.loadedChunks = new TreeMap<>();
@@ -23,19 +23,17 @@ public class World {
         }
     }
 
-    public World() {
-        this(System.currentTimeMillis());
-    }
-
     public int getHeight() {
         return chunkHeight;
     }
 
     public Chunk loadChunk(BigInteger chunkPos) {
         if (!loadedChunks.containsKey(chunkPos)) {
-            Chunk newChunk = new Chunk(chunkWidth, chunkHeight, biomeSeed);
+            BigInteger firstBlockPos = chunkPos.multiply(BigInteger.valueOf(chunkWidth));
+            Chunk newChunk = new Chunk(chunkWidth, chunkHeight, firstBlockPos);
 //            newChunk.generate(chunkPos * chunkWidth, noise);
-            new Chunk.TerrainGenerator(newChunk, chunkPos.multiply(BigInteger.valueOf(chunkWidth)).longValue(), noiseSeed).start();
+            Chunk.TerrainGenerator tg = new Chunk.TerrainGenerator(newChunk, noiseSeed);
+            tg.start();
             loadedChunks.put(chunkPos, newChunk);
             return newChunk;
         }
@@ -71,10 +69,6 @@ public class World {
             }
         }
         return positions.toArray(new BlockPos[0]);
-    }
-
-    public void reloadAllChunks() {
-        loadedChunks.clear();
     }
 
     public int getChunkWidth() {

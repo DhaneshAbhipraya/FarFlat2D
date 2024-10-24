@@ -7,7 +7,7 @@ public class PerlinNoise {
     private static final int SIZE = 256;
     private static final int MASK = SIZE - 1;
 
-    private int[] perm;
+    private final int[] perm;
     private double[] gradients;
 
     public PerlinNoise() {
@@ -38,7 +38,7 @@ public class PerlinNoise {
         System.arraycopy(perm, 0, perm, SIZE, SIZE);
     }
 
-    private double fade(double t) {
+    public static double fade(double t) {
         return t * t * t * (t * (t * 6 - 15) + 10);
     }
 
